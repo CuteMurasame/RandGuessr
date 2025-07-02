@@ -1,0 +1,448 @@
+{% extends "layout.njk" %}
+
+{% block content %}
+<div class="ui container">
+    <div class="ui grid">
+        <div class="six wide column">
+            <div class="ui card">
+                <div class="content">
+                    <div class="ui massive circular label" style="margin-bottom: 10px;">
+                        {{ profileUser.username[0] }}
+                    </div>
+                    <div class="header">
+                        <span class="{{ profileUserRatingColor }}">{{ profileUser.username }}</span>
+                        <span class="ui red label">
+                            {{ profileUser.user_type }}
+                        </span>
+                        {% if profileUser.is_anonymous %}
+                        <span class="ui grey label">Anonymous</span>
+                        {% endif %}
+                    </div>
+                    <div class="description" id="bio-section">
+                        <span id="bio-text">
+                            {% if profileUser.profile_bio %}
+                                {{ profileUser.profile_bio }}
+                            {% else %}
+                                <em>No bio available</em>
+                            {% endif %}
+                        </span>
+                        {% if curUsername == profileUser.username %}
+                        <a id="edit-bio-btn" class="ui fluid green small" style="cursor: pointer;">
+                            <i id="edit-icon" class="edit icon"></i>
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="content">
+                    <div class="ui two column grid">
+                        <div class="column">
+                            <strong>UID</strong><br>
+                            {{ profileUser.uid }}
+                        </div>
+                        <div class="column">
+                            <strong>Joined (UTC+8)</strong><br>
+                            {{ moment(profileUser.registered_at).tz("Asia/Shanghai").format("YYYY-MM-DD HH:mm") }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="ten wide column">
+            <div class="ui statistics">
+                <div class="statistic">
+                    <div class="value">{{ profileUser.total_duels }}</div>
+                    <div class="label">Total Duels</div>
+                </div>
+                <div class="green statistic">
+                    <div class="value">{{ profileUser.total_wins }}</div>
+                    <div class="label">Wins</div>
+                </div>
+                <div class="red statistic">
+                    <div class="value">{{ profileUser.total_losses }}</div>
+                    <div class="label">Losses</div>
+                </div>
+                <div class="yellow statistic">
+                    <div class="value">{{ profileUser.total_draws }}</div>
+                    <div class="label">Draws</div>
+                </div>
+                <div class="teal statistic">
+                    <div class="value">{{ winPercentage }}%</div>
+                    <div class="label">Win Rate</div>
+                </div>
+            </div>
+            
+            <div class="ui divider"></div>
+
+            <h3 class="ui header">
+                Rating: <span class="{{ profileUserRatingColor }}">{{ profileUser.elo_rating }}</span> (max. <span class="{{ profileUserPeakRatingColor }}">{{ profileUser.peak_elo }}</span>)
+            </h3>
+            <div class="ui segment">
+                <div class="ui statistics">
+                    <div class="rating-container">
+                        <div class="chart-container">
+                            <!-- Chart -->
+                            <div class="chart-wrapper">
+                                <canvas id="ratingChart"></canvas>
+                            </div>
+
+                            <div id="chartLoading" class="loading">
+                                📊 Loading rating history...
+                            </div>
+
+                            <div id="noChartData" class="no-data" style="display: none;">
+                                📊 No rating history available yet. Play some rated games to see your progress!
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="ui divider"></div>
+
+            <h3 class="ui header">Recent Duels</h3>
+            {% if recentDuels and recentDuels.length > 0 %}
+            <div class="ui segment">
+                <div class="ui relaxed divided list">
+                    {% for duel in recentDuels %}
+                    <div class="item">
+                        {# Determine color based on result for the label #}
+                        {% set result_class = 'grey' %} {# Default for ongoing #}
+                        {% if duel.result == 'win' %}{% set result_class = 'green' %}
+                        {% elif duel.result == 'loss' %}{% set result_class = 'red' %}
+                        {% elif duel.result == 'draw' %}{% set result_class = 'yellow' %}
+                        {% endif %}
+
+                        <div class="right floated content">
+                            <div class="ui {{ result_class }} label">{{ duel.result | capitalize }}</div>
+                        </div>
+                        <i class="large-icon middle aligned swords icon"></i>
+                        <div class="content">
+                            <a class="header" href="/duel/{{ duel.id }}">
+                                {% if duel.player1_uid == profileUser.uid %}
+                                    <strong>{{ duel.player1_name }}</strong> vs {{ duel.player2_name }}
+                                {% else %}
+                                    {{ duel.player1_name }} vs <strong>{{ duel.player2_name }}</strong>
+                                {% endif %}
+                            </a>
+                            <div class="description">
+                                Score: {{ duel.player1_score }} - {{ duel.player2_score }} · Played {{ moment(duel.created_at).fromNow() }}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="ui center aligned basic segment">
+                 <a href="/user/{{ profileUser.uid }}/duels" class="ui primary button">
+                    <i class="history icon"></i>
+                    View All Duels
+                </a>
+            </div>
+            {% else %}
+            <div class="ui placeholder segment">
+                <div class="ui icon header">
+                    <i class="gamepad icon"></i>
+                    No Duels Found
+                </div>
+                <p>This user hasn't completed any duels yet.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% if curUsername == profileUser.username %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const editBtn = document.getElementById('edit-bio-btn');
+    const bioSection = document.getElementById('bio-section');
+    const bioTextSpan = document.getElementById('bio-text');
+    const editIcon = document.getElementById('edit-icon');
+
+    let isEditing = false;
+    let originalBio = "{% if profileUser.profile_bio %}{{ profileUser.profile_bio | e }}{% endif %}";
+
+    const saveBio = () => {
+        const bioInput = bioSection.querySelector('input[type="text"]');
+        const newBio = bioInput.value.trim();
+
+        Swal.fire({
+            title: 'Saving...',
+            text: 'Please wait while we update your bio.',
+            allowOutsideClick: false,
+            didOpen: () => {
+                Swal.showLoading();
+            }
+        });
+
+        fetch('/user/edit-bio', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({ bio: newBio })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                Swal.fire({
+                    title: 'Success!',
+                    text: 'Your bio has been updated.',
+                    icon: 'success',
+                    timer: 800,
+                    showConfirmButton: false
+                }).then(() => {
+                    window.location.reload();
+                });
+            } else {
+                throw new Error(data.message || 'An unknown error occurred.');
+            }
+        })
+        .catch(error => {
+            Swal.fire({
+                title: 'Error!',
+                text: error.message,
+                icon: 'error'
+            }).then((result) => {
+                location.reload();
+            });
+        });
+    };
+
+    editBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        isEditing = !isEditing;
+
+        if (isEditing) {
+            // Change to input field
+            const currentBio = (originalBio === 'No bio available' || !originalBio) ? '' : originalBio;
+            bioTextSpan.style.display = 'none';
+            const dvv = document.createElement('div');
+            dvv.className = "ui input small";
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = currentBio;
+            input.style.width = 'calc(100% - 45px)'; // Adjust width to not overlap the button
+            dvv.appendChild(input);
+
+            input.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    saveBio();
+                }
+            });
+
+            bioSection.prepend(dvv);
+            input.focus();
+            
+            // Change icon to save
+            editIcon.classList.remove('edit');
+            editIcon.classList.add('save');
+        } else {
+            // This case is now handled by the saveBio function
+             saveBio();
+        }
+    });
+});
+</script>
+{% endif %}
+
+<script>
+    // Global variables
+    let ratingChart = null;
+    let allRatingData = [];
+    let currentPeriod = 'all';
+
+    // Initialize page
+    document.addEventListener('DOMContentLoaded', async function() {
+        await loadRatingData();
+        setupEventListeners();
+    });
+
+    // Load rating data from server (now properly sorted by duel finish time)
+    async function loadRatingData() {
+        try {
+            console.log('📊 [2025-06-30 08:24:45] Loading rating data for UID {{ profileUser.uid }} (sorted by duel time)');
+
+            const response = await fetch('/api/user/{{ profileUser.uid }}/rating-history?limit=1000');
+            const data = await response.json();
+
+            if (data.success && data.history.length > 0) {
+                allRatingData = data.history; // Already sorted chronologically by duel finish time
+                document.getElementById('chartLoading').style.display = 'none';
+                initializeChart();
+                console.log(`📊 [2025-06-30 08:24:45] Loaded ${allRatingData.length} games in proper chronological order`);
+            } else {
+                document.getElementById('chartLoading').style.display = 'none';
+                document.getElementById('noChartData').style.display = 'block';
+                console.log('📊 [2025-06-30 08:24:45] No rating data available');
+            }
+        } catch (error) {
+            console.error('❌ [2025-06-30 08:24:45] Error loading rating data:', error);
+            document.getElementById('chartLoading').style.display = 'none';
+            document.getElementById('noChartData').style.display = 'block';
+        }
+    }
+
+    // Initialize Chart.js chart
+    function initializeChart() {
+        const ctx = document.getElementById('ratingChart').getContext('2d');
+
+        ratingChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                datasets: [{
+                    label: 'Rating',
+                    data: [],
+                    borderColor: '#667eea',
+                    backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                    borderWidth: 3,
+                    pointBackgroundColor: '#667eea',
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 2,
+                    pointRadius: 5,
+                    pointHoverRadius: 7,
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    intersect: false,
+                    mode: 'index'
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        titleColor: 'white',
+                        bodyColor: 'white',
+                        borderColor: '#667eea',
+                        borderWidth: 1,
+                        callbacks: {
+                            title: function(context) {
+                                const dataPoint = allRatingData[context[0].dataIndex];
+                                if (dataPoint && dataPoint.game_number === 0) {
+                                    return 'Starting Rating';
+                                }
+                                return `Game #${context[0].parsed.x}`;
+                            },
+                            label: function(context) {
+                                const dataPoint = allRatingData[context.dataIndex];
+                                if (!dataPoint) return `Rating: ${context.parsed.y}`;
+
+                                if (dataPoint.game_number === 0) {
+                                    return `Starting Rating: ${context.parsed.y}`;
+                                }
+
+                                const change = dataPoint.elo_change;
+                                const changeText = change > 0 ? `+${change}` : change;
+                                return [
+                                    `Rating: ${context.parsed.y}`,
+                                    `Change: ${changeText}`,
+                                    `Result: ${dataPoint.result.toUpperCase()}`,
+                                    `vs ${dataPoint.opponent_name} (${dataPoint.opponent_elo})`,
+                                    `Duel Date: ${new Date(dataPoint.created_at).toLocaleString()}`
+                                ];
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        type: 'linear',
+                        title: {
+                            display: true,
+                            text: 'Game Number'
+                        },
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.1)'
+                        },
+                        ticks: {
+                            stepSize: 1,
+                            callback: function(value) {
+                                return Math.floor(value) === value ? (value === 0 ? 'Start' : `${value}`) : '';
+                            }
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Rating'
+                        },
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.1)'
+                        }
+                    }
+                },
+                elements: {
+                    point: {
+                        backgroundColor: function(context) {
+                            const dataPoint = allRatingData[context.dataIndex];
+                            if (!dataPoint || dataPoint.game_number === 0) return '#667eea';
+
+                            if (dataPoint.result === 'win') return '#28a745';
+                            if (dataPoint.result === 'loss') return '#dc3545';
+                            return '#ffc107';
+                        }
+                    }
+                }
+            }
+        });
+
+        updateChart();
+    }
+
+    // Update chart with filtered data
+    function updateChart() {
+        if (!ratingChart || allRatingData.length === 0) return;
+
+        let filteredData = [...allRatingData];
+
+        // Filter data based on selected period (number of games)
+        if (currentPeriod !== 'all') {
+            const gameLimit = parseInt(currentPeriod);
+            // Take the last N games
+            filteredData = allRatingData.slice(-gameLimit);
+        }
+
+        // Add sequential game numbers for equal spacing
+        filteredData.forEach((item, index) => {
+            item.chart_game_number = index + 1;
+        });
+
+        // Convert to Chart.js format with game numbers as X axis
+        const chartData = filteredData.map(item => ({
+            x: item.chart_game_number,
+            y: item.new_elo
+        }));
+
+        // Update chart
+        ratingChart.data.datasets[0].data = chartData;
+
+        // Update X-axis configuration based on data length
+        const maxGameNumber = Math.max(...filteredData.map(item => item.chart_game_number));
+        ratingChart.options.scales.x.max = maxGameNumber;
+        ratingChart.options.scales.x.min = 1;
+
+        // Adjust step size based on number of games
+        if (maxGameNumber <= 10) {
+            ratingChart.options.scales.x.ticks.stepSize = 1;
+        } else if (maxGameNumber <= 50) {
+            ratingChart.options.scales.x.ticks.stepSize = 5;
+        } else {
+            ratingChart.options.scales.x.ticks.stepSize = 10;
+        }
+
+        ratingChart.update('none');
+
+        console.log(`📊 [2025-06-30 08:24:45] Chart updated with ${filteredData.length} data points (period: ${currentPeriod} games) - Chronological order maintained`);
+    }
+</script>
+
+{% endblock %}

@@ -1,0 +1,82 @@
+{% extends "layout.njk" %}
+
+{% block content %}
+<div class="ui middle aligned center aligned grid" style="min-height: 60vh;">
+    <div class="column" style="max-width: 500px;">
+        <b> （因不可抗因素，本站将会在 6 月 30 日关服，请等待公网版本） </b>
+        <h1 class="ui header">
+            <i class="trophy icon"></i>
+            <div class="content">
+                大厅
+                <div class="sub header">Ready to duel, {{ user.username }}?</div>
+            </div>
+        </h1>
+
+        {% if error %}
+        <div class="ui error message">
+            {{ error }}
+        </div>
+        {% endif %}
+    
+        <div class="ui segment">
+            <h3 class="ui header">
+                <i class="crosshairs icon"></i>
+                Number Duel Challenge
+            </h3>
+            <p>规则：</p>
+            <div class="ui list">
+                <div class="item">
+                    <i class="circle outline icon"></i>
+                    <div class="content">你要选 1, 2, 3 中的一个数</div>
+                </div>
+                <div class="item">
+                    <i class="random icon"></i>
+                    <div class="content">答案是 1, 2, 3 中的随机数</div>
+                </div>
+                <div class="item">
+                    <i class="trophy icon"></i>
+                    <div class="content">选对就加分</div>
+                </div>
+                <div class="item">
+                    <i class="flag checkered icon"></i>
+                    <div class="content">积分高者获胜</div>
+                </div>
+            </div>
+        </div>
+    
+        <form method="POST" action="/matchmaking/start">
+            <button class="ui huge primary button" type="submit">
+                <i class="play icon"></i>
+                开始匹配
+            </button>
+        </form>
+    
+        <div class="ui horizontal divider">规则</div>
+    
+        <div class="ui three statistics">
+            <div class="statistic">
+                <div class="value">
+                    <i class="users icon"></i>
+                    5
+                </div>
+                <div class="label">每次匹配轮数</div>
+            </div>
+            <div class="statistic">
+                <div class="value">
+                    <i class="clock icon"></i>
+                    15s
+                </div>
+                <div class="label">Time Limit</div>
+            </div>
+        </div>
+    
+        <div class="ui basic segment">
+            <p class="ui small text center aligned">
+                <i class="trophy icon yellow"></i>
+                <a href="/leaderboard"> 排行榜 </a>
+            </p>
+            作者：Gennady Korotkevich，开源项目。
+        </div>
+    </div>
+</div>
+{% endblock %}

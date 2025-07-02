@@ -1,0 +1,740 @@
+{% extends "layout.njk" %}
+
+{% block content %}
+<div class="ui container">
+    <center><h1>公告：17:00 关服</h1></center>
+    <div class="ui grid">
+        <div class="sixteen wide column">
+            <h2 class="ui center aligned header">
+                <i class="crosshairs icon"></i>
+                <span id="round-title">Round {{ duel.currentRound }} of {{ duel.totalRounds }}</span>
+                <div class="sub header">
+                    {% if opponent.uid %}
+                        <a href="/user/{{ opponent.uid }}">{{ opponent.name }}</a>
+                    {% else %}
+                        {{ opponent.name }}
+                    {% endif %}
+                    vs
+                    {% if user.uid %}
+                        <a href="/user/{{ user.uid }}">{{ user.username }}</a>
+                    {% else %}
+                        {{ user.username }}
+                    {% endif %}
+                </div>
+            </h2>
+        </div>
+    </div>
+
+    <!-- Score Display -->
+    <div class="ui two column grid">
+        <div class="column">
+            <div class="ui fluid card">
+                <div class="content">
+                    <div class="header">
+                        {% if user.uid %}
+                            <a href="/user/{{ user.uid }}">{{ user.username }}</a>
+                        {% else %}
+                            {{ user.username }}
+                        {% endif %}
+                        {% if user.userType %}
+                            <span class="ui red mini label">
+                                {{ user.userType }}
+                            </span>
+                        {% endif %}
+                    </div>
+                    <div class="ui large statistic">
+                        <div class="value" id="my-score">{{ duel.myScore }}</div>
+                        <div class="label">Points</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="column">
+            <div class="ui fluid card">
+                <div class="content">
+                    <div class="header">
+                        {% if opponent.uid %}
+                            <a href="/user/{{ opponent.uid }}">{{ opponent.name }}</a>
+                        {% else %}
+                            {{ opponent.name }}
+                        {% endif %}
+                    </div>
+                    <div class="ui large statistic">
+                        <div class="value" id="opponent-score">{{ duel.opponentScore }}</div>
+                        <div class="label">Points</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Progress Bar for 5 rounds -->
+    <div class="ui indicating progress" data-value="{{ duel.currentRound }}" data-total="{{ duel.totalRounds }}">
+        <div class="bar"></div>
+        <div class="label">Round {{ duel.currentRound }} of {{ duel.totalRounds }}</div>
+    </div>
+    <br>
+
+    <!-- Dynamic content area -->
+    <div id="dynamic-content">
+        {% if duel.status == 'preparing' %}
+            <!-- Preparation State -->
+            <div class="ui center aligned segment" id="preparing-area">
+                <h3 class="ui header">
+                    <i class="hourglass start icon"></i>
+                    Get Ready for 5 Rounds!
+                </h3>
+                <p>The duel will start in <span id="prep-countdown" class="ui big red text">5</span> seconds...</p>
+                <div class="ui active centered inline loader"></div>
+                
+                <div class="ui message">
+                    <div class="header">Enhanced Game Rules</div>
+                    <ul class="list">
+                        <li><strong>5 rounds</strong> instead of 3 for more exciting gameplay!</li>
+                        <li>Choose a number: 1, 2, or 3</li>
+                        <li>You have 15 seconds to pick after your opponent picks</li>
+                        <li>Get points for correct guesses</li>
+                        <li>Best of 5 rounds wins!</li>
+                    </ul>
+                </div>
+                
+                <div class="ui tiny label">
+                    Server Time Sync: <span id="sync-status">Connecting...</span>
+                </div>
+            </div>
+
+        {% elif duel.status == 'playing' %}
+            <!-- Playing State -->
+            <div class="ui center aligned segment" id="playing-area">
+                {% if duel.myGuess %}
+                    <h3 class="ui header">
+                        <i class="checkmark icon green"></i>
+                        You picked: <span class="ui large label">{{ duel.myGuess }}</span>
+                    </h3>
+                    <p id="waiting-message">
+                        Waiting for 
+                        {% if opponent.uid %}
+                            <a href="/user/{{ opponent.uid }}">{{ opponent.name }}</a>
+                        {% else %}
+                            {{ opponent.name }}
+                        {% endif %}
+                        ...
+                    </p>
+                    
+                    {% if duel.firstPickAt %}
+                    <div class="ui warning message">
+                        <i class="clock icon"></i>
+                        <span id="timer-message">{{ opponent.name }} has 15 seconds to pick!</span>
+                    </div>
+                    <div class="ui progress" id="timer-progress">
+                        <div class="bar"></div>
+                        <div class="label">Time remaining</div>
+                    </div>
+                    {% endif %}
+                    
+                {% else %}
+                    {% if duel.firstPickAt %}
+                        <h3 class="ui header">
+                            <i class="hand point up icon"></i>
+                            <span id="pick-instruction">{{ opponent.name }} picked! Choose your number!</span>
+                        </h3>
+                        
+                        <div class="ui warning message">
+                            <i class="clock icon"></i>
+                            <span id="timer-message">You have 15 seconds to pick!</span>
+                        </div>
+                        <div class="ui progress" id="timer-progress">
+                            <div class="bar"></div>
+                            <div class="label">Time remaining</div>
+                        </div>
+                    {% else %}
+                        <h3 class="ui header">
+                            <i class="hand point up icon"></i>
+                            <span id="pick-instruction">Choose your number!</span>
+                        </h3>
+                    {% endif %}
+                    
+                    <div class="ui three column grid" id="pick-buttons">
+                        <div class="column">
+                            <button class="ui huge button fluid pick-button" data-pick="1">
+                                <i class="circle outline icon"></i>
+                                1
+                            </button>
+                        </div>
+                        <div class="column">
+                            <button class="ui huge button fluid pick-button" data-pick="2">
+                                <i class="circle outline icon"></i>
+                                2
+                            </button>
+                        </div>
+                        <div class="column">
+                            <button class="ui huge button fluid pick-button" data-pick="3">
+                                <i class="circle outline icon"></i>
+                                3
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="ui basic segment">
+                        <p class="ui small text">
+                            <i class="keyboard icon"></i>
+                            Tip: You can also use keyboard keys 1, 2, 3 to pick!
+                        </p>
+                    </div>
+                {% endif %}
+            </div>
+
+        {% elif duel.status == 'results' %}
+            <!-- Results State -->
+            <div class="ui center aligned segment" id="results-area">
+                <h2 class="ui header">
+                    <i class="trophy icon"></i>
+                    Round {{ duel.currentRound }} Results
+                </h2>
+                
+                <div class="ui big label">
+                    <i class="target icon"></i>
+                    Answer: {{ duel.answer }}
+                </div>
+
+                <div class="ui two column divided grid" style="margin-top: 20px;">
+                    <div class="column">
+                        <h4>
+                            {% if user.uid %}
+                                <a href="/user/{{ user.uid }}">{{ user.username }}</a>
+                            {% else %}
+                                {{ user.username }}
+                            {% endif %}
+                            {% if user.userType %}
+                                <span class="ui red mini label">
+                                    {{ user.userType }}
+                                </span>
+                            {% endif %}
+                        </h4>
+                        <div class="ui large label {% if duel.myGuess == duel.answer and duel.myGuess != 'timeout' %}green{% elif duel.myGuess == 'timeout' %}grey{% else %}red{% endif %}">
+                            {% if duel.myGuess == 'timeout' %}
+                                <i class="clock icon"></i> Timeout
+                            {% else %}
+                                {{ duel.myGuess }}
+                            {% endif %}
+                        </div>
+                        <p>
+                            {% if duel.myGuess == duel.answer and duel.myGuess != 'timeout' %}
+                                <i class="checkmark icon green"></i> Correct! +1 point
+                            {% elif duel.myGuess == 'timeout' %}
+                                <i class="clock icon"></i> Too slow
+                            {% else %}
+                                <i class="x icon red"></i> Wrong
+                            {% endif %}
+                        </p>
+                    </div>
+                    <div class="column">
+                        <h4>
+                            {% if opponent.uid %}
+                                <a href="/user/{{ opponent.uid }}">{{ opponent.name }}</a>
+                            {% else %}
+                                {{ opponent.name }}
+                            {% endif %}
+                        </h4>
+                        <div class="ui large label {% if duel.opponentGuess == duel.answer and duel.opponentGuess != 'timeout' %}green{% elif duel.opponentGuess == 'timeout' %}grey{% else %}red{% endif %}">
+                            {% if duel.opponentGuess == 'timeout' %}
+                                <i class="clock icon"></i> Timeout
+                            {% else %}
+                                {{ duel.opponentGuess }}
+                            {% endif %}
+                        </div>
+                        <p>
+                            {% if duel.opponentGuess == duel.answer and duel.opponentGuess != 'timeout' %}
+                                <i class="checkmark icon green"></i> Correct! +1 point
+                            {% elif duel.opponentGuess == 'timeout' %}
+                                <i class="clock icon"></i> Too slow
+                            {% else %}
+                                <i class="x icon red"></i> Wrong
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+
+                <div class="ui message">
+                    <p id="results-message">
+                        {% if duel.currentRound >= duel.totalRounds %}
+                            <i class="flag checkered icon"></i> Final results in <span id="results-countdown">5</span> seconds...
+                        {% else %}
+                            <i class="forward icon"></i> Round {{ duel.currentRound + 1 }} starts in <span id="results-countdown">5</span> seconds...
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+
+        {% elif duel.status == 'finished' %}
+            <!-- Finished State -->
+            <div class="ui center aligned segment" id="finished-area">
+                <h2 class="ui header">
+                    <i class="flag checkered icon"></i>
+                    5-Round Duel Complete!
+                </h2>
+                
+                {% if duel.myScore > duel.opponentScore %}
+                    <div class="ui huge green label">
+                        <i class="trophy icon"></i>
+                        Victory!
+                    </div>
+                    <p>🎉 Congratulations! You won the 5-round duel!</p>
+                {% elif duel.myScore < duel.opponentScore %}
+                    <div class="ui huge red label">
+                        <i class="frown icon"></i>
+                        Defeat
+                    </div>
+                    <p>😔 Better luck next time! {{ opponent.name }} won this 5-round duel.</p>
+                {% else %}
+                    <div class="ui huge orange label">
+                        <i class="handshake icon"></i>
+                        Draw!
+                    </div>
+                    <p>🤝 It's a tie! Both players played equally well in all 5 rounds!</p>
+                {% endif %}
+
+                <div class="ui statistic" style="margin: 20px 0;">
+                    <div class="value">{{ duel.myScore }} - {{ duel.opponentScore }}</div>
+                    <div class="label">Final Score (Best of 5)</div>
+                </div>
+
+                <div class="ui two column grid" style="margin: 20px 0;">
+                    <div class="column">
+                        <form method="POST" action="/duel/{{ duel.id }}/leave">
+                            <button class="ui big primary button fluid" type="submit">
+                                <i class="home icon"></i>
+                                Back to Lobby
+                            </button>
+                        </form>
+                    </div>
+                    <div class="column">
+                        {% if user.uid %}
+                            <a href="/user/{{ user.uid }}/duels" class="ui big secondary button fluid">
+                                <i class="history icon"></i>
+                                View My Duels
+                            </a>
+                        {% else %}
+                            <a href="/lobby" class="ui big secondary button fluid">
+                                <i class="home icon"></i>
+                                Lobby
+                            </a>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="ui basic segment">
+                    <h4 class="ui header">Post-Duel Options</h4>
+                    <div class="ui buttons">
+                        {% if user.uid %}
+                            <a href="/user/{{ user.uid }}" class="ui button">
+                                <i class="user icon"></i>
+                                My Profile
+                            </a>
+                        {% endif %}
+                        {% if opponent.uid %}
+                            <a href="/user/{{ opponent.uid }}" class="ui button">
+                                <i class="user icon"></i>
+                                {{ opponent.name }}'s Profile
+                            </a>
+                        {% endif %}
+                        <a href="/lobby" class="ui green button">
+                            <i class="play icon"></i>
+                            Play Again
+                        </a>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Leave Duel Button -->
+    {% if duel.status != 'finished' %}
+    <div class="ui center aligned basic segment">
+        <form method="POST" action="/duel/{{ duel.id }}/leave" onsubmit="return confirm('Are you sure you want to leave this 5-round duel?')">
+            <button class="ui small red button" type="submit">
+                <i class="sign out icon"></i>
+                Leave Duel
+            </button>
+        </form>
+    </div>
+    {% endif %}
+
+    <!-- Enhanced Debug Info -->
+    <div class="ui basic segment">
+        <div class="ui tiny labels">
+            <div class="ui blue label">
+                Duel ID: {{ duel.id }}...
+            </div>
+            <div class="ui green label">
+                Status: {{ duel.status }}
+            </div>
+            <div class="ui teal label">
+                Round: {{ duel.currentRound }}/{{ duel.totalRounds }}
+            </div>
+            <div class="ui purple label">
+                Enhanced: 2025-06-25 13:16:10
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Enhanced duel system with complete 5-round support
+const duelId = '{{ duel.id }}';
+let currentStatus = '{{ duel.status }}';
+let currentRound = {{ duel.currentRound }};
+const totalRounds = {{ duel.totalRounds }};
+const firstPickAt = {% if duel.firstPickAt %}'{{ duel.firstPickAt }}'{% else %}null{% endif %};
+const resultsStartAt = {% if duel.resultsStartAt %}'{{ duel.resultsStartAt }}'{% else %}null{% endif %};
+const gameStartAt = {% if duel.gameStartAt %}'{{ duel.gameStartAt }}'{% else %}null{% endif %};
+
+// Initialize Socket.io
+const socket = io();
+
+// Server time synchronization
+let serverTimeOffset = 0;
+let isTimeSynced = false;
+
+let timers = {
+    preparation: null,
+    pickTimeout: null,
+    resultsCountdown: null
+};
+
+console.log('🎮 [2025-06-25 13:16:10] Enhanced 5-round duel system loaded');
+console.log(`📊 Duel: ${duelId} - Status: ${currentStatus}`);
+console.log(`🎯 Round: ${currentRound}/${totalRounds}`);
+console.log(`🕐 Game starts at: ${gameStartAt}`);
+
+// Initialize progress bar
+if (typeof $ !== 'undefined') {
+    $('.ui.progress').progress();
+}
+
+// Server time sync function
+async function syncServerTime() {
+    try {
+        console.log('🕐 [2025-06-25 13:16:10] Syncing with server time...');
+        
+        const requestTime = Date.now();
+        const response = await fetch('/api/server-time');
+        const responseTime = Date.now();
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        const networkLatency = (responseTime - requestTime) / 2;
+        const serverTime = new Date(data.serverTime).getTime();
+        const adjustedServerTime = serverTime + networkLatency;
+        
+        serverTimeOffset = adjustedServerTime - responseTime;
+        isTimeSynced = true;
+        
+        console.log(`✅ [2025-06-25 13:16:10] Server time synced! Offset: ${serverTimeOffset}ms`);
+        if (typeof $ !== 'undefined') {
+            $('#sync-status').text('Synced').css('color', 'green');
+        }
+        
+        return true;
+    } catch (error) {
+        console.error('❌ [2025-06-25 13:16:10] Failed to sync server time:', error);
+        if (typeof $ !== 'undefined') {
+            $('#sync-status').text('Failed').css('color', 'red');
+        }
+        
+        serverTimeOffset = 0;
+        isTimeSynced = false;
+        return false;
+    }
+}
+
+// Get current server time
+function getServerTime() {
+    return Date.now() + serverTimeOffset;
+}
+
+// Preparation countdown that triggers auto-refresh
+function startPreparationCountdown() {
+    if (!gameStartAt) {
+        console.log('⚠️ [2025-06-25 13:16:10] Cannot start countdown - missing gameStartAt');
+        return;
+    }
+    
+    const startTime = new Date(gameStartAt).getTime();
+    
+    console.log(`🎯 [2025-06-25 13:16:10] Starting 5-round preparation countdown...`);
+    console.log(`🕐 Target time: ${gameStartAt}`);
+    console.log(`🕐 Current server time: ${new Date(getServerTime()).toISOString()}`);
+    
+    timers.preparation = setInterval(() => {
+        const serverNow = getServerTime();
+        const remaining = Math.max(0, startTime - serverNow);
+        const seconds = Math.ceil(remaining / 1000);
+        
+        if (typeof $ !== 'undefined') {
+            $('#prep-countdown').text(seconds);
+        }
+        
+        console.log(`⏰ [2025-06-25 13:16:10] Countdown: ${seconds}s remaining`);
+        
+        // Auto-refresh when server time reaches game_start_at
+        if (remaining <= 0) {
+            clearInterval(timers.preparation);
+            if (typeof $ !== 'undefined') {
+                $('#prep-countdown').text('0');
+                $('#preparing-area h3').html('<i class="play icon green"></i> Starting 5-Round Duel!');
+                $('#preparing-area p').html('Loading game...');
+            }
+            
+            console.log('🎮 [2025-06-25 13:16:10] *** 5-ROUND DUEL AUTO-REFRESH TRIGGERED ***');
+            
+            setTimeout(() => {
+                console.log('🔄 [2025-06-25 13:16:10] *** REFRESHING TO START 5-ROUND DUEL ***');
+                location.reload();
+            }, 500);
+        }
+    }, 100);
+}
+
+function startPickTimer() {
+    if (!firstPickAt) return;
+    
+    const startTime = new Date(firstPickAt).getTime();
+    const duration = 15000;
+    
+    timers.pickTimeout = setInterval(() => {
+        const serverNow = getServerTime();
+        const elapsed = serverNow - startTime;
+        const remaining = Math.max(0, duration - elapsed);
+        const percentage = Math.max(0, (remaining / duration) * 100);
+        
+        if (typeof $ !== 'undefined') {
+            $('#timer-progress .bar').css('width', percentage + '%');
+            $('#timer-progress .label').text(`${Math.ceil(remaining / 1000)}s remaining`);
+        }
+        
+        if (remaining <= 0) {
+            clearInterval(timers.pickTimeout);
+            if (typeof $ !== 'undefined') {
+                $('#timer-progress .label').text('Time expired!');
+            }
+        }
+    }, 100);
+}
+
+function startResultsCountdown() {
+    if (!resultsStartAt) return;
+    
+    const startTime = new Date(resultsStartAt).getTime();
+    const duration = 5000;
+    
+    timers.resultsCountdown = setInterval(() => {
+        const serverNow = getServerTime();
+        const elapsed = serverNow - startTime;
+        const remaining = Math.max(0, duration - elapsed);
+        const seconds = Math.ceil(remaining / 1000);
+        
+        if (typeof $ !== 'undefined') {
+            $('#results-countdown').text(seconds);
+        }
+        
+        if (remaining <= 0) {
+            clearInterval(timers.resultsCountdown);
+        }
+    }, 100);
+}
+
+// Pick button handling
+function handlePickButton(pick) {
+    console.log(`🎯 [2025-06-25 13:16:10] Attempting to pick: ${pick}`);
+    
+    if (typeof $ !== 'undefined') {
+        $('.pick-button').addClass('loading disabled');
+    }
+    
+    fetch(`/duel/${duelId}/pick`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ pick: pick })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            console.log(`✅ [2025-06-25 13:16:10] Pick successful: ${pick} (Round ${currentRound}/${totalRounds})`);
+        } else {
+            console.error('❌ Pick failed:', data.error);
+            if (typeof $ !== 'undefined') {
+                $('.pick-button').removeClass('loading disabled');
+            }
+        }
+    })
+    .catch(error => {
+        console.error('❌ Pick error:', error);
+        if (typeof $ !== 'undefined') {
+            $('.pick-button').removeClass('loading disabled');
+        }
+    });
+}
+
+// WebSocket event handling
+if (typeof socket !== 'undefined') {
+    socket.on('duel_updated', function(data) {
+        if (data.duelId !== duelId) return;
+        
+        console.log('🔄 [2025-06-25 13:16:10] Real-time 5-round duel update:', data);
+        
+        switch(data.action) {
+            case 'game_started':
+                if (currentStatus === 'preparing') {
+                    console.log('🎮 5-round duel started via WebSocket!');
+                    location.reload();
+                }
+                break;
+                
+            case 'first_pick':
+                console.log('🎯 First pick made in 5-round duel');
+                location.reload();
+                break;
+                
+            case 'both_picked':
+                console.log('📊 Both players picked in 5-round duel');
+                location.reload();
+                break;
+                
+            case 'timeout':
+                console.log('⏰ Timeout occurred in 5-round duel');
+                location.reload();
+                break;
+                
+            case 'next_round':
+                console.log(`▶️ Next round in 5-round duel: ${data.round}/${totalRounds}`);
+                location.reload();
+                break;
+                
+            case 'duel_finished':
+                console.log('🏁 5-round duel finished');
+                location.reload();
+                break;
+        }
+    });
+}
+
+// Async initialization
+async function initializeDuelSystem() {
+    console.log('🚀 [2025-06-25 13:16:10] *** INITIALIZING 5-ROUND DUEL SYSTEM ***');
+    
+    // Sync server time
+    await syncServerTime();
+    
+    // Update progress bar
+    if (typeof $ !== 'undefined') {
+        $('.ui.progress').progress('set progress', currentRound);
+    }
+    
+    // Initialize based on status
+    console.log(`📊 [2025-06-25 13:16:10] Current status: ${currentStatus}`);
+    
+    if (currentStatus === 'preparing') {
+        console.log('🕐 [2025-06-25 13:16:10] *** STARTING 5-ROUND COUNTDOWN ***');
+        startPreparationCountdown();
+        
+        // Emergency check
+        if (gameStartAt) {
+            const startTime = new Date(gameStartAt).getTime();
+            const serverNow = getServerTime();
+            
+            console.log(`🕐 Server time: ${new Date(serverNow).toISOString()}`);
+            console.log(`🎯 5-round duel starts: ${gameStartAt}`);
+            console.log(`⏰ Time remaining: ${Math.max(0, startTime - serverNow)}ms`);
+            
+            if (serverNow >= startTime) {
+                console.log('🚨 [2025-06-25 13:16:10] *** EMERGENCY REFRESH - 5-ROUND DUEL STARTED ***');
+                setTimeout(() => location.reload(), 100);
+            }
+        }
+    } else if (currentStatus === 'playing') {
+        console.log('🎮 [2025-06-25 13:16:10] 5-round duel is playing');
+        if (firstPickAt) {
+            startPickTimer();
+        }
+    } else if (currentStatus === 'results') {
+        console.log('📊 [2025-06-25 13:16:10] Showing 5-round duel results');
+        startResultsCountdown();
+    }
+    
+    console.log('✅ [2025-06-25 13:16:10] *** 5-ROUND DUEL SYSTEM READY ***');
+}
+
+// Initialize when DOM is ready
+if (typeof $ !== 'undefined') {
+    $(document).ready(function() {
+        console.log('📄 [2025-06-25 13:16:10] *** DOM READY - STARTING 5-ROUND DUEL INITIALIZATION ***');
+        
+        // Initialize Semantic UI components
+        $('.ui.progress').progress();
+        
+        // Pick button event handlers
+        $('.pick-button').click(function() {
+            const pick = $(this).data('pick');
+            handlePickButton(pick);
+        });
+        
+        // Keyboard shortcuts
+        $(document).keydown(function(e) {
+            if (e.which >= 49 && e.which <= 51) { // Keys 1, 2, 3
+                const pick = e.which - 48;
+                const button = $(`.pick-button[data-pick="${pick}"]`);
+                if (button.length && !button.hasClass('disabled')) {
+                    button.click();
+                }
+            }
+        });
+        
+        // Execute initialization
+        initializeDuelSystem();
+    });
+} else {
+    // Fallback if jQuery isn't loaded
+    console.log('📄 [2025-06-25 13:16:10] *** INITIALIZING WITHOUT JQUERY ***');
+    initializeDuelSystem();
+    
+    // Add pick button listeners
+    document.addEventListener('DOMContentLoaded', function() {
+        const pickButtons = document.querySelectorAll('.pick-button');
+        pickButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const pick = this.getAttribute('data-pick');
+                handlePickButton(pick);
+            });
+        });
+        
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            if (e.which >= 49 && e.which <= 51) { // Keys 1, 2, 3
+                const pick = e.which - 48;
+                const button = document.querySelector(`.pick-button[data-pick="${pick}"]`);
+                if (button && !button.classList.contains('disabled')) {
+                    button.click();
+                }
+            }
+        });
+    });
+}
+
+// Cleanup timers on page unload
+window.addEventListener('beforeunload', function() {
+    Object.values(timers).forEach(timer => {
+        if (timer) clearInterval(timer);
+    });
+});
+
+console.log('✅ [2025-06-25 13:16:10] *** 5-ROUND DUEL SCRIPT LOADED COMPLETELY ***');
+console.log('🎮 Enhanced features: 5 rounds, user profiles, complete round tracking, server time sync');
+</script>
+{% endblock %}
